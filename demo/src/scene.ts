@@ -311,6 +311,94 @@ export class Stage {
 		throw new Error(`${relPath} did not come to contain "${needle}" within ${timeout}ms`);
 	}
 
+	/**
+	 * Wait until VS Code's built-in image preview is showing a picture it
+	 * loaded *after* `since`, for the file whose name contains `fileName`.
+	 *
+	 * A file on disk being correct does not mean the pane showing it is: the
+	 * preview reloads through its own file watcher, on its own schedule. And a
+	 * `beat()` long enough to usually cover that is exactly the kind of wait
+	 * that fails on a loaded machine and leaves a stale pane in the still —
+	 * with the video looking plausible either way, since the harness cannot
+	 * tell a stale pane from a deliberate one.
+	 *
+	 * What makes this checkable is that the image preview cache-busts its
+	 * `<img>` with `?version=<Date.now()>` every time it re-renders, so the URL
+	 * in the DOM says when the picture on screen was loaded. We read that from
+	 * the webview host frames through the Electron main process: webview hosts
+	 * are out-of-process iframes, which `webContents.mainFrame.framesInSubtree`
+	 * reaches and Playwright's frame attachment may not.
+	 *
+	 * Having confirmed it, spend two animation frames in the host so the
+	 * renderer has produced a frame before the caller captures pixels: the DOM
+	 * being right is necessary, not sufficient, when the capture comes off a
+	 * headless X server rather than out of the app.
+	 */
+	async waitForImagePreview(fileName: string, since: number, timeout = 20_000): Promise<void> {
+		const deadline = Date.now() + timeout;
+		let seen: number[] = [];
+		while (Date.now() < deadline) {
+			seen = await this.imagePreviewVersions(fileName);
+			if (seen.some((v) => v > since)) {
+				await this.flushFrames();
+				return;
+			}
+			await this.page.waitForTimeout(150);
+		}
+		throw new Error(
+			`the image preview of "${fileName}" did not reload within ${timeout}ms ` +
+			`(versions on screen: ${seen.length ? seen.join(', ') : 'none'}; wanted one after ${since})`,
+		);
+	}
+
+	/** `?version=` timestamps of every image preview currently showing `fileName`. */
+	private async imagePreviewVersions(fileName: string): Promise<number[]> {
+		return this.app.evaluate(async ({ BrowserWindow }, name) => {
+			const win = BrowserWindow.getAllWindows().find((w) => w.webContents.getURL().includes('workbench'));
+			if (!win) {
+				return [];
+			}
+			const script = `(() => {
+				const out = [];
+				for (const fr of document.querySelectorAll('iframe')) {
+					try {
+						const img = fr.contentDocument && fr.contentDocument.querySelector('img');
+						if (!img) continue;
+						const src = img.getAttribute('src') || '';
+						if (src.indexOf(${JSON.stringify(name)}) === -1) continue;
+						const m = /version(?:%3D|=)(\\d+)/.exec(src);
+						if (m) out.push(Number(m[1]));
+					} catch (e) { /* a frame mid-swap */ }
+				}
+				return out;
+			})()`;
+			const found: number[] = [];
+			for (const frame of win.webContents.mainFrame.framesInSubtree) {
+				if (!frame.url.includes('index.html')) {
+					continue;
+				}
+				try {
+					found.push(...(await frame.executeJavaScript(script, true) as number[]));
+				} catch { /* frame went away underneath us */ }
+			}
+			return found;
+		}, fileName);
+	}
+
+	/** Let every webview host produce a frame before pixels are captured. */
+	private async flushFrames(): Promise<void> {
+		await this.app.evaluate(async ({ BrowserWindow }) => {
+			const win = BrowserWindow.getAllWindows().find((w) => w.webContents.getURL().includes('workbench'));
+			if (!win) {
+				return;
+			}
+			const twoFrames = `new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r(1))))`;
+			await Promise.all(win.webContents.mainFrame.framesInSubtree
+				.filter((f) => f.url.includes('index.html'))
+				.map((f) => f.executeJavaScript(twoFrames, true).catch(() => undefined)));
+		});
+	}
+
 	/** Wait until the active editor's visible text contains `needle`. */
 	async waitForEditorText(needle: string, timeout = 30_000): Promise<void> {
 		await this.page.waitForFunction(

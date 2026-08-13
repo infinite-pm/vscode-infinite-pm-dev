@@ -11,6 +11,7 @@ extension's build.
 | Directory | What it is |
 | --- | --- |
 | [`demo/`](demo/) | Scripted screen recordings of the extension — real VS Code, driven by Playwright inside a container, captured to `mp4` + `gif`. |
+| [`docs/`](docs/) | Notes on the tooling itself — see [`headless-recording.md`](docs/headless-recording.md) for what a headless capture will lie to you about, and why a scene waits on state rather than on a pause. |
 
 ## demo — programmatic feature videos
 

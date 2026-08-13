@@ -101,25 +101,17 @@ export default {
 		await s.caption('The preview has 42 already. The file below it does not.');
 		await s.beat(2000);
 
+		// Two things have to be true before this shot is worth taking, and
+		// neither is a pause: the file has to have been rewritten, and the pane
+		// showing it has to have reloaded. The pane does reload on its own —
+		// what it does not do is promise to have done so by the time a beat()
+		// expires. See docs/headless-recording.md.
 		await s.caption('Save — and the file catches up');
+		const savedAt = Date.now();
 		await s.act('save-catches-up', async () => {
 			await s.save();
-			// Wait for the write itself, not for a hopeful pause: the shot is
-			// worthless unless the file really has caught up.
 			await s.waitForWorkspaceFile('_ipm/answer/100.ipm.svg', '>42<');
-		}, { settle: 2000, shows: 'The save rewrites the SVG on disk, and the marker hash changes with it' });
-
-		// VS Code's image preview shows the copy it loaded when the editor
-		// opened; it does not re-read the file when something else rewrites it.
-		// Waiting longer does not help -- six seconds and a verified write still
-		// left the old picture on screen -- so the scene reopens the file, which
-		// is what a person would do, instead of pretending the pane refreshed.
-		await s.caption('That pane still holds the file as it was opened — open it again');
-		await s.act('reopen-svg', async () => {
-			await s.click('.tab[aria-label^="100.ipm.svg"]');
-			await s.key('Control+w', { delay: 600 });
-			await s.explorerRow('100.ipm.svg');
-			await s.palette('View: Move Editor into Group Below');
-		}, { settle: 2200, shows: 'Reopened from disk: the file now carries 42 too' });
+			await s.waitForImagePreview('100.ipm.svg', savedAt);
+		}, { settle: 2000, shows: 'The save rewrites the SVG on disk, the marker hash changes with it, and the pane below reloads' });
 	},
 } satisfies Scene;

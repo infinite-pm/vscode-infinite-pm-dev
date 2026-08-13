@@ -28,6 +28,17 @@ export async function launchVSCode(profile: Profile): Promise<Session> {
 			'--disable-gpu',
 			'--force-device-scale-factor=1',
 
+			// Nothing here is ever in the foreground the way Chromium means it:
+			// there is no window manager to grant focus, and a window it treats
+			// as backgrounded or occluded gets its timers clamped and its
+			// compositing deprioritised. That is invisible in most of a
+			// recording and then very visible in one frame — a pane whose DOM
+			// has already updated while the captured pixels have not. Measured
+			// case: the image preview swapping in a freshly rendered SVG.
+			'--disable-renderer-backgrounding',
+			'--disable-background-timer-throttling',
+			'--disable-backgrounding-occluded-windows',
+
 			'--user-data-dir', profile.userDataDir,
 			'--extensions-dir', profile.extensionsDir,
 			'--disable-workspace-trust',
