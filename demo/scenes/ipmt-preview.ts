@@ -41,6 +41,20 @@ export default {
 			await s.type('humans --> alive ::c\n', { delay: 45 });
 		}, { settle: 2000, shows: 'humans and AIs join the 21st century, and humans expresses "alive"' });
 
+		// `humans --> Life` (line 7) came with the file. Now that humans feeds
+		// the 21st century, and the 21st century is *part of* Life, that edge
+		// states what the graph already implies -- so delete it. An edge you can
+		// derive is an edge worth removing; the render proves nothing was lost.
+		await s.caption('humans → Life is implicit now — humans → 21st century → part of Life');
+		await s.focusEditor();
+		await s.gotoLine(7);
+		await s.act('remove-implied-edge', async () => {
+			await s.key('Control+Shift+K', { delay: 500 });
+			await s.waitForNoEditorText('humans --> Life');
+			await s.waitForNoPreviewError();
+			await s.waitForDiagram(3);
+		}, { settle: 2000, shows: 'The redundant edge is gone, and humans still reaches Life through the 21st century' });
+
 		// Optional: a scene should still produce a usable video if the pane moved.
 		if (await s.has('iframe.webview', 2_000)) {
 			// The preview scales by exp(-deltaY * 0.0015) per notch, so three of

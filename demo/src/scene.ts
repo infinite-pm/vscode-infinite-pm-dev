@@ -74,6 +74,7 @@ const KEY_LABELS: Record<string, string> = {
 	'Control+P': 'quick open   ctrl + p',
 	'Control+g': 'go to line   ctrl + g',
 	'Control+Shift+M': 'problems   ctrl + shift + m',
+	'Control+Shift+K': 'delete line   ctrl + shift + k',
 };
 
 /** Sentence-case a slug, for a step given no description of its own. */
@@ -651,6 +652,21 @@ export class Stage {
 	async waitForEditorText(needle: string, timeout = 30_000): Promise<void> {
 		await this.page.waitForFunction(
 			(text) => document.querySelector('.editor-instance .view-lines')?.textContent?.includes(text) ?? false,
+			needle,
+			{ timeout },
+		);
+	}
+
+	/**
+	 * Wait until the active editor's visible text no longer contains `needle`.
+	 *
+	 * The mirror of `waitForEditorText`, for a deletion: a step that removes a
+	 * line has to prove the line went, or a missed keystroke photographs the
+	 * same as a successful delete.
+	 */
+	async waitForNoEditorText(needle: string, timeout = 30_000): Promise<void> {
+		await this.page.waitForFunction(
+			(text) => !(document.querySelector('.editor-instance .view-lines')?.textContent?.includes(text) ?? false),
 			needle,
 			{ timeout },
 		);
