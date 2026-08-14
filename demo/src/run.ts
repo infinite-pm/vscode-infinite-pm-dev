@@ -8,7 +8,7 @@
  * Normally invoked through the container entrypoint (which supplies the Xvfb
  * display), i.e. `make demo`.
  */
-import { readdirSync } from 'node:fs';
+import { existsSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { OUT_DIR, SCENES_DIR, STILLS_DIR, VIDEO_DIR } from './config.ts';
@@ -132,9 +132,21 @@ async function main(): Promise<void> {
 		writeIndex();
 	}
 	console.log(`\nrecorded ${scenes.length - failed.length}/${scenes.length} scene(s) into ${OUT_DIR}`);
+
+	// A failed scene leaves a partial mp4 and a FAILURE still beside last
+	// week's good ones, and `make publish` rsyncs the directory wholesale into
+	// the assets repo — from which `make dist` carries GIFs into the extension
+	// README the Marketplace shows. Leave a marker the publish step can see,
+	// and clear it when everything passed, so a green run after a red one is
+	// not blocked by a stale file.
+	const marker = join(OUT_DIR, 'FAILED');
 	if (failed.length) {
+		writeFileSync(marker, `${failed.join('\n')}\n`);
 		console.error(`failed: ${failed.join(', ')}`);
+		console.error(`wrote ${marker} — \`make publish\` will refuse until this is resolved`);
 		process.exitCode = 1;
+	} else if (existsSync(marker)) {
+		rmSync(marker);
 	}
 }
 

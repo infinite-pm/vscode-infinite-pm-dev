@@ -351,6 +351,214 @@ export class Stage {
 		);
 	}
 
+	/**
+	 * Read something out of every webview host frame on screen.
+	 *
+	 * The recordings photograph webviews — the Markdown preview, the .ipmt
+	 * preview — and until now asserted only that an `iframe.webview` existed,
+	 * which is true of a webview showing nothing at all. `script` runs inside
+	 * each host frame; its children (`#active-frame`) are same-origin with it,
+	 * so their DOM is readable from there.
+	 *
+	 * Through the Electron main process rather than Playwright: webview hosts
+	 * are out-of-process iframes, which `framesInSubtree` reaches reliably and
+	 * Playwright's frame attachment may not.
+	 */
+	async readWebviews<T>(script: string): Promise<T[]> {
+		return this.app.evaluate(async ({ BrowserWindow }, src) => {
+			const win = BrowserWindow.getAllWindows().find((w) => w.webContents.getURL().includes('workbench'));
+			if (!win) {
+				return [];
+			}
+			const out: unknown[] = [];
+			for (const frame of win.webContents.mainFrame.framesInSubtree) {
+				if (!frame.url.includes('index.html')) {
+					continue;
+				}
+				try {
+					out.push(await frame.executeJavaScript(src, true));
+				} catch { /* a frame mid-swap */ }
+			}
+			return out;
+		}, script) as Promise<T[]>;
+	}
+
+	/**
+	 * Every ipmt fence rendered in a Markdown preview, with the token classes
+	 * actually painted on it. An empty `spanClasses` is the "black fence" bug —
+	 * the one that shipped twice, visible in every frame of a recording that
+	 * reported green.
+	 */
+	async ipmtFences(): Promise<Array<{ text: string; spanClasses: string[] }>> {
+		const script = `(() => {
+			const out = [];
+			for (const fr of document.querySelectorAll('iframe')) {
+				try {
+					const d = fr.contentDocument;
+					if (!d) continue;
+					for (const code of d.querySelectorAll('code.language-ipmt')) {
+						out.push({
+							text: code.textContent || '',
+							spanClasses: [...new Set([...code.querySelectorAll('span[class^="ipm-"]')]
+								.map(s => s.getAttribute('class')))],
+						});
+					}
+				} catch (e) { /* cross-origin or mid-swap */ }
+			}
+			return out;
+		})()`;
+		const perHost = await this.readWebviews<Array<{ text: string; spanClasses: string[] }>>(script);
+		return perHost.flat();
+	}
+
+	/** Wait until a Markdown preview shows a coloured ipmt fence. */
+	async waitForColouredFence(minClasses = 3, timeout = 20_000): Promise<void> {
+		const deadline = Date.now() + timeout;
+		let seen: Array<{ spanClasses: string[] }> = [];
+		while (Date.now() < deadline) {
+			seen = await this.ipmtFences();
+			if (seen.some((f) => f.spanClasses.length >= minClasses)) {
+				return;
+			}
+			await this.page.waitForTimeout(150);
+		}
+		throw new Error(
+			`no ipmt fence in the preview carries ${minClasses} token classes after ${timeout}ms ` +
+			`(found ${seen.length} fence(s): ${JSON.stringify(seen.map((f) => f.spanClasses))}). ` +
+			'An uncoloured fence is what this scene is filming.',
+		);
+	}
+
+	/** The `<img>` sources inside every webview: `data:` means a live render. */
+	async previewImages(): Promise<Array<{ src: string; live: boolean }>> {
+		const script = `(() => {
+			const out = [];
+			for (const fr of document.querySelectorAll('iframe')) {
+				try {
+					const d = fr.contentDocument;
+					if (!d) continue;
+					for (const img of d.querySelectorAll('img')) {
+						const src = img.getAttribute('src') || '';
+						out.push({ src: src.slice(0, 60), live: src.indexOf('data:') === 0 });
+					}
+				} catch (e) { /* cross-origin or mid-swap */ }
+			}
+			return out;
+		})()`;
+		const perHost = await this.readWebviews<Array<{ src: string; live: boolean }>>(script);
+		return perHost.flat();
+	}
+
+	/** Wait until the preview swaps a committed SVG for an in-memory render. */
+	async waitForLiveDiagram(timeout = 20_000): Promise<void> {
+		const deadline = Date.now() + timeout;
+		let seen: Array<{ src: string; live: boolean }> = [];
+		while (Date.now() < deadline) {
+			seen = await this.previewImages();
+			if (seen.some((i) => i.live)) {
+				return;
+			}
+			await this.page.waitForTimeout(150);
+		}
+		throw new Error(
+			`no preview image is an in-memory render after ${timeout}ms (saw ${JSON.stringify(seen)}). ` +
+			'Live refresh is the subject of this scene; filming the committed SVG instead ' +
+			'would look identical and mean the opposite.',
+		);
+	}
+
+	/** Error banners currently shown in any .ipmt preview pane. */
+	async previewErrors(): Promise<string[]> {
+		const script = `(() => {
+			const out = [];
+			for (const fr of document.querySelectorAll('iframe')) {
+				try {
+					const d = fr.contentDocument;
+					if (!d) continue;
+					for (const e of d.querySelectorAll('#error-banner .error, .error')) {
+						const t = (e.textContent || '').trim();
+						if (t) out.push(t);
+					}
+				} catch (e) { /* cross-origin or mid-swap */ }
+			}
+			return out;
+		})()`;
+		const perHost = await this.readWebviews<string[]>(script);
+		return perHost.flat();
+	}
+
+	/** Wait for a preview error banner whose text matches `pattern`. */
+	async waitForPreviewError(pattern: RegExp, timeout = 20_000): Promise<string> {
+		const deadline = Date.now() + timeout;
+		let seen: string[] = [];
+		while (Date.now() < deadline) {
+			seen = await this.previewErrors();
+			const hit = seen.find((t) => pattern.test(t));
+			if (hit) {
+				return hit;
+			}
+			await this.page.waitForTimeout(150);
+		}
+		throw new Error(
+			`no preview error matching ${pattern} after ${timeout}ms (banners: ${JSON.stringify(seen)})`,
+		);
+	}
+
+	/** Wait for every preview error banner to clear. */
+	async waitForNoPreviewError(timeout = 20_000): Promise<void> {
+		const deadline = Date.now() + timeout;
+		let seen: string[] = [];
+		while (Date.now() < deadline) {
+			seen = await this.previewErrors();
+			if (seen.length === 0) {
+				return;
+			}
+			await this.page.waitForTimeout(150);
+		}
+		throw new Error(`preview still shows ${JSON.stringify(seen)} after ${timeout}ms`);
+	}
+
+	/** Rendered diagram sizes in any preview pane, from each SVG's viewBox. */
+	async previewDiagrams(): Promise<Array<{ width: number; height: number; nodes: number }>> {
+		const script = `(() => {
+			const out = [];
+			for (const fr of document.querySelectorAll('iframe')) {
+				try {
+					const d = fr.contentDocument;
+					if (!d) continue;
+					for (const svg of d.querySelectorAll('svg')) {
+						const vb = svg.viewBox && svg.viewBox.baseVal;
+						out.push({
+							width: vb ? vb.width : 0,
+							height: vb ? vb.height : 0,
+							nodes: svg.querySelectorAll('text').length,
+						});
+					}
+				} catch (e) { /* cross-origin or mid-swap */ }
+			}
+			return out;
+		})()`;
+		const perHost = await this.readWebviews<Array<{ width: number; height: number; nodes: number }>>(script);
+		return perHost.flat();
+	}
+
+	/** Wait until a preview pane is showing a diagram with actual geometry. */
+	async waitForDiagram(minLabels = 1, timeout = 20_000): Promise<void> {
+		const deadline = Date.now() + timeout;
+		let seen: Array<{ width: number; height: number; nodes: number }> = [];
+		while (Date.now() < deadline) {
+			seen = await this.previewDiagrams();
+			if (seen.some((d) => d.width > 0 && d.height > 0 && d.nodes >= minLabels)) {
+				return;
+			}
+			await this.page.waitForTimeout(150);
+		}
+		throw new Error(
+			`no preview shows a diagram with >=${minLabels} labels after ${timeout}ms ` +
+			`(saw ${JSON.stringify(seen)}). An empty pane photographs the same as a full one.`,
+		);
+	}
+
 	/** `?version=` timestamps of every image preview currently showing `fileName`. */
 	private async imagePreviewVersions(fileName: string): Promise<number[]> {
 		return this.app.evaluate(async ({ BrowserWindow }, name) => {

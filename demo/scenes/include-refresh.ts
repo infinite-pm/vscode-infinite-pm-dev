@@ -47,6 +47,10 @@ export default {
 			await s.type('42 --> number ::c\n', { delay: 50 });
 			await s.beat(1000);
 			await s.save();
+			// Saving the .ipmt must re-embed the page that includes it. Wait
+			// for the committed SVG to actually carry 42 — the caption says it
+			// arrives, and a scene that films the old diagram says so too.
+			await s.waitForWorkspaceFile('_ipm/page/answer.ipm.svg', '>42<');
 		}, { settle: 3000, shows: 'Saving the .ipmt re-embeds the page: 42 arrives in the diagram, still with no source in the render' });
 
 		await s.caption('The page re-embedded itself — still no source in the render');

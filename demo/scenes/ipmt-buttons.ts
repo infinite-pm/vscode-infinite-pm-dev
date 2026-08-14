@@ -34,6 +34,7 @@ export default {
 		await s.act('open-in-place', async () => {
 			await s.editorAction('Open as Preview');
 			await s.waitFor('iframe.webview', 45_000);
+			await s.waitForDiagram(3);   // a webview that renders nothing looks the same
 		}, { settle: 2200, shows: 'The diagram replaces the source view, and the way back appears in the title bar' });
 
 		await s.caption('The preview carries the way back');
@@ -48,6 +49,7 @@ export default {
 		await s.act('open-to-the-side', async () => {
 			await s.editorAction('Open Preview to the Side');
 			await s.waitFor('iframe.webview', 45_000);
+			await s.waitForDiagram(3);   // a webview that renders nothing looks the same
 		}, { settle: 2000, shows: 'The other button keeps source and diagram side by side' });
 
 		await s.caption('One line, and the diagram keeps up');

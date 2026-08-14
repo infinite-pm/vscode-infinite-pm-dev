@@ -26,6 +26,10 @@ export default {
 		await s.act('open-preview', async () => {
 			await s.palette('Markdown: Open Preview to the Side');
 			await s.waitFor('iframe.webview', 45_000);
+			// "The fence coloured in both panes" is the caption's claim, so it
+			// is what the scene waits for. An iframe existing is true of a
+			// preview showing nothing.
+			await s.waitForColouredFence();
 		}, { settle: 2600, shows: 'The fence coloured in both panes, with the diagram from disk below it' });
 
 		await s.caption('Zoom in on part of the graph — without saving');
@@ -43,6 +47,10 @@ export default {
 
 		await s.act('add-alive', async () => {
 			await s.type('\nhumans --> alive ::c', { delay: 45 });
+			// The subject of the whole scene: the <img> must be an in-memory
+			// render, not the SVG committed to disk. Both look identical on
+			// screen and mean opposite things.
+			await s.waitForLiveDiagram();
 		}, { settle: 2400, shows: 'humans expresses "alive" — the whole edit rendered, nothing written to disk' });
 
 		await s.caption('The preview swapped in a freshly rendered SVG');

@@ -23,6 +23,7 @@ export default {
 		await s.act('open-preview', async () => {
 			await s.palette('infinite.pm: Open Preview to the Side');
 			await s.waitFor('iframe.webview', 45_000);
+			await s.waitForDiagram(3);   // "rendered", not "a pane appeared"
 		}, { settle: 1800, shows: 'A valid graph, rendered beside its source' });
 
 		await s.focusEditor();
@@ -31,6 +32,10 @@ export default {
 		await s.caption('Near-to (::N) only relates nodes of the same kind');
 		await s.act('type-invalid-line', async () => {
 			await s.type('humans --::N-- alive ::c', { delay: 60 });
+			// The caption promises a banner that says WHY, so match the rule
+			// rather than merely "some error": a generic parse failure here
+			// would be a different (worse) story than the one being told.
+			await s.waitForPreviewError(/Near-?to|::N/i);
 		}, { settle: 2600, shows: 'An invalid Near-to: red banner over the last good diagram, squiggle on the line, one error in the status bar' });
 
 		await s.caption('The preview keeps the last good diagram and says why');
@@ -50,6 +55,9 @@ export default {
 		await s.key('Shift+End', { delay: 400 });
 		await s.act('fix-the-line', async () => {
 			await s.type('humans --> alive ::c', { delay: 60 });
+			// "Banner gone, diagram back" — both halves, or the still is a lie.
+			await s.waitForNoPreviewError();
+			await s.waitForDiagram(3);
 		}, { settle: 2800, shows: 'Corrected to a plain leads-to: banner gone, no problems, and "alive" in the diagram' });
 
 		await s.caption('Banner gone, Problems empty, diagram back');

@@ -19,6 +19,7 @@ export default {
 		await s.act('open-preview', async () => {
 			await s.palette('infinite.pm: Open Preview to the Side');
 			await s.waitFor('iframe.webview', 45_000);
+			await s.waitForDiagram(3);   // a webview that renders nothing looks the same
 		}, { settle: 2200, shows: 'The preview opens beside the source, showing the whole graph' });
 
 		await s.caption('Typing re-renders in memory — nothing is written to disk');

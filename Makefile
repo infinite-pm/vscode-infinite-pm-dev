@@ -131,6 +131,17 @@ demo: vsix rpc entrypoint provenance
 publish:
 	@test -d "$(ASSETS_REPO)" || { echo "no assets repo at $(ASSETS_REPO) -- set ASSETS_REPO=" >&2; exit 1; }
 	@test -f "$(OUT)/README.md" || { echo "nothing rendered yet -- run 'make demo' first" >&2; exit 1; }
+# A scene that failed leaves a partial mp4 and a FAILURE still next to the good
+# ones from the last run, and this target copies the directory wholesale. Refuse
+# rather than publish a mixture nobody can tell apart. ALLOW_PARTIAL=1 to
+# override deliberately -- e.g. republishing prose changes while one scene is
+# known-broken.
+ifndef ALLOW_PARTIAL
+	@test ! -f "$(OUT)/FAILED" || { \
+		echo "refusing to publish: these scenes failed in the last run:" >&2; \
+		sed 's/^/  /' "$(OUT)/FAILED" >&2; \
+		echo "re-record them, or set ALLOW_PARTIAL=1 if you mean it." >&2; exit 1; }
+endif
 	mkdir -p "$(ASSETS_REPO)/video" "$(ASSETS_REPO)/stills"
 	rsync -a --delete "$(OUT)/video/" "$(ASSETS_REPO)/video/"
 	rsync -a --delete "$(OUT)/stills/" "$(ASSETS_REPO)/stills/"
