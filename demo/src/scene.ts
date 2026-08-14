@@ -106,6 +106,15 @@ export class Stage {
 		mkdirSync(this.stillsDir, { recursive: true });
 	}
 
+	/**
+	 * Record something the recording itself cannot show — a fallback taken, a
+	 * condition that had to be forced. Goes to the run log so a scene that
+	 * limped through does not read as one that sailed.
+	 */
+	note(message: string): void {
+		console.log(`    note [${this.sceneId}]: ${message}`);
+	}
+
 	/** A pause, in milliseconds of *demo* time (scaled by DEMO_SPEED). */
 	async beat(ms = 700): Promise<void> {
 		await this.page.waitForTimeout(Math.max(0, Math.round(ms * SPEED)));
@@ -341,13 +350,44 @@ export class Stage {
 			seen = await this.imagePreviewVersions(fileName);
 			if (seen.some((v) => v > since)) {
 				await this.flushFrames();
+				await this.repaint();
 				return;
 			}
 			await this.page.waitForTimeout(150);
 		}
+		// This failure has two very different causes and they need telling
+		// apart: either the preview never reloaded (a product problem), or it
+		// reloaded and the framebuffer we capture from did not follow (a
+		// headless-compositing problem — see docs/headless-recording.md). The
+		// version numbers on screen say which, so report them either way.
+		const stale = seen.length > 0 && seen.every((v) => v <= since);
 		throw new Error(
 			`the image preview of "${fileName}" did not reload within ${timeout}ms ` +
-			`(versions on screen: ${seen.length ? seen.join(', ') : 'none'}; wanted one after ${since})`,
+			`(versions on screen: ${seen.length ? seen.join(', ') : 'none'}; wanted one after ${since}). ` +
+			(stale
+				? 'The pane is showing an OLDER render, so the reload itself never happened.'
+				: 'No image preview for that file was on screen at all — check the pane is open.'),
+		);
+	}
+
+	/**
+	 * Ask the compositor for a fresh frame.
+	 *
+	 * Under Xvfb with software rendering and no window manager, a webview whose
+	 * DOM has changed does not reliably reach the X framebuffer that ffmpeg
+	 * grabs — most visibly when the image preview swaps in a whole new iframe.
+	 * `invalidate()` is Electron's way of saying "repaint everything", which is
+	 * the nudge a compositor with no damage events never gets.
+	 */
+	async repaint(): Promise<void> {
+		await this.app.evaluate(async ({ BrowserWindow }) => {
+			for (const win of BrowserWindow.getAllWindows()) {
+				win.webContents.invalidate();
+			}
+		});
+		// One frame for the invalidate to land, one for it to be composited.
+		await this.page.evaluate(
+			() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null)))),
 		);
 	}
 
@@ -688,6 +728,9 @@ export class Stage {
 
 	/** Grab one frame into the scene's stills directory; returns the base name. */
 	private async shoot(base: string): Promise<string> {
+		// A DOM that has changed is not a framebuffer that has: nudge the
+		// compositor before grabbing, or the still can lag the app it shows.
+		await this.repaint();
 		await grabFrame(join(this.stillsDir, base));
 		return base;
 	}

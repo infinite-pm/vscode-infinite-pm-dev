@@ -103,15 +103,30 @@ export default {
 
 		// Two things have to be true before this shot is worth taking, and
 		// neither is a pause: the file has to have been rewritten, and the pane
-		// showing it has to have reloaded. The pane does reload on its own —
-		// what it does not do is promise to have done so by the time a beat()
-		// expires. See docs/headless-recording.md.
+		// showing it has to be showing the new one.
+		//
+		// The first is ours and is asserted outright. The second is VS Code's
+		// image preview, which watches its own file — and does so unreliably in
+		// this environment: measured over a dozen runs it reloaded in some and
+		// not others, with the DOM (not just the captured pixels) still holding
+		// the older render. So: wait for it, and if it does not come, do what a
+		// person would and reopen the file, saying so rather than filming a
+		// stale pane and calling it a catch-up. See docs/headless-recording.md.
 		await s.caption('Save — and the file catches up');
 		const savedAt = Date.now();
 		await s.act('save-catches-up', async () => {
 			await s.save();
 			await s.waitForWorkspaceFile('_ipm/answer/100.ipm.svg', '>42<');
-			await s.waitForImagePreview('100.ipm.svg', savedAt);
-		}, { settle: 2000, shows: 'The save rewrites the SVG on disk, the marker hash changes with it, and the pane below reloads' });
+			try {
+				await s.waitForImagePreview('100.ipm.svg', savedAt, 8_000);
+			} catch (err) {
+				s.note(`image preview did not reload on its own: ${err instanceof Error ? err.message : err}`);
+				await s.click('.tab[aria-label^="100.ipm.svg"]');
+				await s.key('Control+w', { delay: 400 });
+				await s.explorerRow('100.ipm.svg');
+				await s.palette('View: Move Editor into Group Below');
+				await s.waitForImagePreview('100.ipm.svg', savedAt, 15_000);
+			}
+		}, { settle: 2000, shows: 'The save rewrites the SVG on disk, the marker hash changes with it, and the pane below shows the new diagram' });
 	},
 } satisfies Scene;
