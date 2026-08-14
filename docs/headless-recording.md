@@ -83,6 +83,11 @@ between them. `waitForImagePreview` now names which of the two happened, and
 `embed-on-save` waits, then reopens the file the way a person would, and calls
 `s.note()` so the run log records that it limped.
 
+One more measurement, so the next person does not repeat it: given **60 seconds**
+instead of 8, the pane still does not reload. It is not slow, it does not
+happen. Whatever wakes VS Code's image preview in some runs is absent in others,
+and waiting is not what distinguishes them.
+
 That is not a diagnosis, it is a boundary: what we control is asserted, what we
 do not is detected and worked around out loud.
 
