@@ -1,0 +1,6 @@
+# The banner's model, verbatim from ipm-drawio/cmd-dev/banner-gen/content.go.
+# The two 42 lines are added by the scene.
+
+"Life, the Universe and Everything" ::e lue::a
+humans / AI / machines ::t --> lue
+lue --> Complex process ::c

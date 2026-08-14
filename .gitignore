@@ -1,0 +1,10 @@
+out/
+temp/
+node_modules/
+*.vsix
+
+# Root-level only, and deliberately not demo/workspaces/*/_ipm (those are
+# committed fixtures). Editing a fixture .ipmt on the host with the extension
+# running triggers include refresh, which is scoped to the enclosing git
+# repository -- this one -- and drops rendered SVGs here.
+/_ipm/

@@ -1,0 +1,7 @@
+Beginning ::e
+  --> "Life, the Universe and Everything" ::e lue::a
+  --> Freeze ::e
+
+Life ::e --::P--> lue
+the Universe, everything --> lue
+humans --> Life

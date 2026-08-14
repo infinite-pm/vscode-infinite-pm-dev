@@ -1,0 +1,12 @@
+{
+  "name": "vscode-infinite-pm-demo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Scripted screen recordings of the infinite.pm VS Code extension",
+  "type": "module",
+  "license": "MIT",
+  "dependencies": {
+    "playwright": "1.59.1",
+    "tsx": "^4.20.3"
+  }
+}

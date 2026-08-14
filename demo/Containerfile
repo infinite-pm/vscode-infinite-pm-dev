@@ -1,0 +1,54 @@
+# Feature-demo recorder: real VS Code (Electron) driven by Playwright inside
+# Xvfb, screen-recorded with ffmpeg.
+#
+#   podman build -f demo/Containerfile -t ipm-vscode-demo .        (from repo root)
+#   podman run --rm -v ./demo:/work/demo:z -v ./out:/work/out:z ipm-vscode-demo
+#
+# Everything the recording needs lives in the image -- VS Code, node, Playwright,
+# Xvfb, ffmpeg -- so the host stays clean and two runs on two machines produce
+# the same frames. Only /work/demo (the scripts) and /work/out (the results) are
+# bind-mounted.
+#
+# The base image is Microsoft's Playwright image: it already carries node 22 and
+# the full set of system libraries Chromium/Electron needs, which is the part
+# that is tedious to assemble by hand. Keep its version equal to the `playwright`
+# dependency in demo/package.json.
+FROM mcr.microsoft.com/playwright:v1.59.1-noble
+
+# xvfb   - virtual display (no host X/Wayland involvement)
+# ffmpeg - x11grab screen capture + gif encoding
+# xdotool/x11-utils - display probing while debugging a scene
+# libsecret/libxss  - VS Code wants these on top of the Chromium set
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates curl ffmpeg xvfb x11-utils xdotool \
+        libsecret-1-0 libxss1 \
+        fonts-dejavu-core fonts-liberation \
+    && rm -rf /var/lib/apt/lists/*
+
+# VS Code itself. Pin with --build-arg VSCODE_VERSION=1.106.0 for a reproducible
+# image; "latest" is what a user of the Marketplace build would have.
+ARG VSCODE_VERSION=latest
+ARG VSCODE_QUALITY=stable
+RUN curl -fsSL "https://update.code.visualstudio.com/${VSCODE_VERSION}/linux-x64/${VSCODE_QUALITY}" \
+        -o /tmp/vscode.tar.gz \
+    && mkdir -p /opt/vscode \
+    && tar -xzf /tmp/vscode.tar.gz -C /opt/vscode --strip-components=1 \
+    && rm /tmp/vscode.tar.gz \
+    && /opt/vscode/bin/code --version --no-sandbox --user-data-dir /tmp/probe \
+    && rm -rf /tmp/probe
+
+# Dependencies are installed at / on purpose: the scripts run from the
+# bind-mounted /work/demo, which has no node_modules of its own, and node's
+# resolution walks up /work/demo -> /work -> / and finds them there. No symlink
+# into the mounted source, no NODE_PATH (which ESM ignores anyway).
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+COPY demo/package.json /package.json
+RUN cd / && npm install --no-audit --no-fund
+
+ENV DEMO_IN_CONTAINER=1 \
+    VSCODE_DIR=/opt/vscode
+
+WORKDIR /work
+# Built on the host into out/ (make entrypoint) and mounted, like ipm-rpc, so
+# a change to it does not mean rebuilding this image.
+ENTRYPOINT ["/work/out/demo-entrypoint"]
