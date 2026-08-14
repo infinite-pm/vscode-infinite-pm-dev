@@ -65,6 +65,27 @@ Three properties of this environment conspire:
   then spends two animation frames in each webview host so a frame is actually
   produced. The scene now waits on that rather than on a `beat()`.
 
+## What later runs added
+
+Two follow-ups, once the scenes started asserting instead of hoping.
+
+**Capture gets a nudge.** Every still now calls Electron's
+`webContents.invalidate()` and waits two animation frames before grabbing. That
+is the damage event a compositor with no window manager on top of it never
+receives, and it costs a few milliseconds.
+
+**And the honest part: that did not fix everything.** With the DOM readable
+from the scenes, the remaining failures could be told apart — and VS Code's
+image preview turns out to reload its file *unreliably here*, with the DOM (not
+merely the captured pixels) still holding the previous render. Measured across a
+dozen runs on 2026-08-14: reloaded in some, not in others, no code difference
+between them. `waitForImagePreview` now names which of the two happened, and
+`embed-on-save` waits, then reopens the file the way a person would, and calls
+`s.note()` so the run log records that it limped.
+
+That is not a diagnosis, it is a boundary: what we control is asserted, what we
+do not is detected and worked around out loud.
+
 ## The rule this leaves
 
 **Never take a still on a timer when the thing you are photographing can tell
