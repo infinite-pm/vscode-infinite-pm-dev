@@ -47,6 +47,7 @@ help:
 	@echo "Demo recording (podman, nothing installed on the host):"
 	@echo "  image        - build the container image (VS Code is downloaded into it)"
 	@echo "  demo         - record every scene   (SCENES=\"a b\" to pick, SPEED=0.7 to speed up)"
+	@echo "  e2e          - run the extension's extension-host suite headlessly"
 	@echo "  list         - list available scenes"
 	@echo "  shell        - interactive shell in the image"
 	@echo "  clean        - remove out/"
@@ -91,6 +92,31 @@ ext:
 rpc:
 	@mkdir -p "$(OUT)"
 	cd "$(TOOLS_REPO)" && CGO_ENABLED=0 go build -trimpath -o "$(OUT)/ipm-rpc" ./cmd/ipm-rpc
+
+# The extension's extension-host suite (npm run test:e2e), headless, in the
+# recording image -- so it can be run before a push on a machine with no X
+# server, and without VS Code windows appearing over whatever you are doing.
+# CI runs the same suite under xvfb; this is the local equivalent.
+#
+#   make e2e                        # all of it
+#   make e2e E2E_ARGS="--label e2e" # pass flags through to vscode-test
+E2E_ARGS ?=
+.PHONY: e2e
+e2e: ext-rpc
+	podman run --rm --shm-size=1g --userns=keep-id \
+		-v "$(EXT_REPO)":/work/ext:z \
+		-v "$(TOOLS_REPO)":/work/ipm-tools:ro,z \
+		-v "$(DEMO)":/work/demo:ro,z \
+		--entrypoint bash $(IMAGE) /work/demo/bin/run-e2e.sh $(E2E_ARGS)
+
+# The suite uses the bundled server exactly as a user's install would --
+# no ipm.serverPath -- so the extension repo needs one at the path
+# resolveServer looks in. bin/<GOOS>-<GOARCH>, not the vsce target name:
+# serverPath.ts maps process.arch x64 -> amd64. CI builds it the same way.
+.PHONY: ext-rpc
+ext-rpc:
+	@mkdir -p "$(EXT_REPO)/bin/linux-amd64"
+	cd "$(TOOLS_REPO)" && CGO_ENABLED=0 go build -trimpath -o "$(EXT_REPO)/bin/linux-amd64/ipm-rpc" ./cmd/ipm-rpc
 
 # Re-embed the fixtures that ship already embedded. One --in per file, never a
 # --root walk: embed-on-save's answer.md must stay un-embedded, since that scene
