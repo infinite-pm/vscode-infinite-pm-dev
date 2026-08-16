@@ -11,7 +11,7 @@
 import { existsSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { OUT_DIR, SCENES_DIR, STILLS_DIR, VIDEO_DIR } from './config.ts';
+import { OUT_DIR, SCENES_DIR, STATES_ONLY, STILLS_DIR, VIDEO_DIR } from './config.ts';
 import { closeVSCode, launchVSCode } from './code.ts';
 import { prepareProfile, serverInfo, vscodeVersion } from './profile.ts';
 import { poster, startRecording, toGif } from './capture.ts';
@@ -62,9 +62,15 @@ async function record(scene: Scene): Promise<void> {
 	await stage.pointer();
 	await stage.beat(500);
 
+	// A states run drives the same scene with no camera: the states are
+	// captured by ipm-rpc-tee in front of the server, and nothing under
+	// out/video or out/stills is written, so a capture can never be confused
+	// with -- or overwrite -- a publishable take.
 	const video = join(VIDEO_DIR, `${scene.id}.mp4`);
-	const recording = startRecording(video);
-	await stage.beat(600); // let ffmpeg reach the display before anything moves
+	const recording = STATES_ONLY ? undefined : startRecording(video);
+	if (recording) {
+		await stage.beat(600); // let ffmpeg reach the display before anything moves
+	}
 
 	let failure: unknown;
 	try {
@@ -72,14 +78,21 @@ async function record(scene: Scene): Promise<void> {
 		await stage.beat(900); // a moment on the final frame
 	} catch (error) {
 		failure = error;
-		await stage.snap('FAILURE').catch(() => undefined);
+		if (!STATES_ONLY) {
+			await stage.snap('FAILURE').catch(() => undefined);
+		}
 	} finally {
-		await recording.stop();
+		await recording?.stop();
 		await closeVSCode(app);
 	}
 
 	if (failure) {
 		throw failure;
+	}
+
+	if (STATES_ONLY) {
+		console.log(`--- ${scene.id}: states captured (no video)`);
+		return;
 	}
 
 	await toGif(video, join(VIDEO_DIR, `${scene.id}.gif`));
@@ -127,11 +140,12 @@ async function main(): Promise<void> {
 	}
 
 	const recorded = scenes.filter((s) => !failed.includes(s.id)).map((s) => s.id);
-	if (recorded.length) {
+	if (recorded.length && !STATES_ONLY) {
 		writeProvenance({ ...runtime, scenes: recorded });
 		writeIndex();
 	}
-	console.log(`\nrecorded ${scenes.length - failed.length}/${scenes.length} scene(s) into ${OUT_DIR}`);
+	const verb = STATES_ONLY ? 'captured' : 'recorded';
+	console.log(`\n${verb} ${scenes.length - failed.length}/${scenes.length} scene(s) into ${OUT_DIR}`);
 
 	// A failed scene leaves a partial mp4 and a FAILURE still beside last
 	// week's good ones, and `make publish` rsyncs the directory wholesale into
@@ -140,6 +154,13 @@ async function main(): Promise<void> {
 	// and clear it when everything passed, so a green run after a red one is
 	// not blocked by a stale file.
 	const marker = join(OUT_DIR, 'FAILED');
+	if (STATES_ONLY) {
+		if (failed.length) {
+			console.error(`failed: ${failed.join(', ')}`);
+			process.exitCode = 1;
+		}
+		return;
+	}
 	if (failed.length) {
 		writeFileSync(marker, `${failed.join('\n')}\n`);
 		console.error(`failed: ${failed.join(', ')}`);

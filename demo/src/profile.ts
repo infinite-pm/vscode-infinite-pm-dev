@@ -7,7 +7,7 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
-import { CODE_CLI, FIXTURES_DIR, IPM_RPC, PROFILES_DIR, VSCODE_DIR, VSIX, WORKSPACES_DIR, ZOOM } from './config.ts';
+import { CODE_CLI, FIXTURES_DIR, IPM_RPC, LIVE_DEBOUNCE_MS, PROFILES_DIR, VSCODE_DIR, VSIX, WORKSPACES_DIR, ZOOM } from './config.ts';
 
 export interface Profile {
 	userDataDir: string;
@@ -144,7 +144,7 @@ const BASE_SETTINGS: Record<string, unknown> = {
 
 	// --- the extension under test ---
 	'ipm.liveRefresh': true,
-	'ipm.liveRefreshDebounceMs': 150,
+	'ipm.liveRefreshDebounceMs': LIVE_DEBOUNCE_MS,
 	// Scenes that want to show embed-on-save turn this back on themselves; the
 	// default off keeps a scene from writing _ipm/ SVGs it never shows.
 	'ipm.embedOnSave': false,

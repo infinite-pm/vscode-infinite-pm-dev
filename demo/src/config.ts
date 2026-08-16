@@ -60,6 +60,27 @@ export const ASSETS_URL = (process.env.DEMO_ASSETS_URL
 export const SPEED = num(process.env.DEMO_SPEED, 1);
 
 /**
+ * States mode: drive the scenes to CAPTURE what is typed, not to film it.
+ *
+ * No ffmpeg, no GIF, no stills, no reports -- so nothing under out/video or
+ * out/stills is touched and a capture can never be mistaken for a take, or
+ * quietly replace one. The states themselves come from ipm-rpc-tee, which the
+ * Makefile puts in front of the server; this flag only removes the camera and
+ * tells the profile to render on every keystroke (see LIVE_DEBOUNCE_MS).
+ */
+export const STATES_ONLY = process.env.DEMO_STATES === '1';
+
+/**
+ * The extension's diagram debounce, in ms, for this run.
+ *
+ * A take keeps the shipped default (150) because that is what a viewer gets.
+ * A states run sets 0, which the extension documents and tests as "render on
+ * every change": the engine then really lays out every keystroke, so the
+ * capture records states that were RENDERED rather than merely passed through.
+ */
+export const LIVE_DEBOUNCE_MS = num(process.env.DEMO_LIVE_DEBOUNCE_MS, STATES_ONLY ? 0 : 150);
+
+/**
  * VS Code's window zoom level: each step is 1.2x on the whole workbench, not
  * just the editor font, so icons, tabs and the status bar scale with the text.
  * At 1600x900 that is what makes a downscaled GIF readable.

@@ -40,6 +40,8 @@ PODMAN_RUN = podman run --rm --shm-size=1g --userns=keep-id \
 	-v "$(OUT)":/work/out:z \
 	-e DEMO_WIDTH=$(WIDTH) -e DEMO_HEIGHT=$(HEIGHT) -e DEMO_FPS=$(FPS) \
 	-e DEMO_SPEED=$(SPEED) -e DEMO_ZOOM=$(ZOOM) -e DEMO_ASSETS_URL="$(ASSETS_URL)" \
+	-e DEMO_STATES="$(DEMO_STATES)" -e DEMO_IPM_RPC="$(DEMO_IPM_RPC)" \
+	-e IPM_TEE_REAL="$(IPM_TEE_REAL)" -e IPM_TEE_OUT="$(IPM_TEE_OUT)" \
 	--entrypoint /work/out/demo-entrypoint
 
 .PHONY: help
@@ -48,6 +50,8 @@ help:
 	@echo "  image        - build the container image (VS Code is downloaded into it)"
 	@echo "  demo         - record every scene   (SCENES=\"a b\" to pick, SPEED=0.7 to speed up)"
 	@echo "  e2e          - run the extension's extension-host suite headlessly"
+	@echo "  states       - drive the scenes with NO camera and capture every typed"
+	@echo "                 diagram state into $(STATES_CORPUS) (SCENES=\"a b\" to pick)"
 	@echo "  list         - list available scenes"
 	@echo "  shell        - interactive shell in the image"
 	@echo "  clean        - remove out/"
@@ -149,6 +153,60 @@ entrypoint:
 .PHONY: demo
 demo: vsix rpc entrypoint provenance
 	$(PODMAN_RUN) $(IMAGE) $(SCENES)
+
+# ---------------------------------------------------------------------------
+# States: the same scenes, driven to CAPTURE what they type rather than to film
+# it. See docs/states-corpus.md.
+#
+# Every keystroke reaches the language server as a full buffer (sync=Full), so
+# the states the scenes type are already on that wire; ipm-rpc-tee sits in
+# front of the real server and writes them down. Nothing changes in the
+# extension, and nothing dev-only ships: the tee is a separate binary the
+# recording points DEMO_IPM_RPC at.
+#
+# A capture run writes no video, no gif and no stills, so it can never be
+# mistaken for -- or overwrite -- a publishable take.
+#
+#   make states                    # every scene
+#   make states SCENES=ipmt-preview
+#   make states-curate             # re-curate an existing raw capture
+STATES_RAW     ?= $(OUT)/states-raw
+STATES_CORPUS  ?= $(DEMO)/states
+
+.PHONY: tee
+tee:
+	@mkdir -p "$(OUT)"
+	cd "$(TOOLS_REPO)" && CGO_ENABLED=0 go build -trimpath -o "$(OUT)/ipm-rpc-tee" ./cmd-dev/ipm-rpc-tee
+
+.PHONY: states
+states: vsix rpc tee entrypoint
+	@rm -rf "$(STATES_RAW)" && mkdir -p "$(STATES_RAW)"
+	$(MAKE) states-run
+	$(MAKE) states-curate
+
+# The scenes, camera off, server proxied. In-container paths: /work/out is the
+# bind mount of $(OUT), and DEMO_IPM_RPC is what the profile writes into
+# ipm.serverPath -- so the extension launches the tee, and the tee launches the
+# server named by IPM_TEE_REAL.
+.PHONY: states-run
+states-run:
+	$(MAKE) demo-container \
+		DEMO_STATES=1 \
+		DEMO_IPM_RPC=/work/out/ipm-rpc-tee \
+		IPM_TEE_REAL=/work/out/ipm-rpc \
+		IPM_TEE_OUT=/work/out/states-raw
+
+.PHONY: demo-container
+demo-container:
+	$(PODMAN_RUN) $(IMAGE) $(SCENES)
+
+# Raw capture -> committed corpus: content-addressed .ipmt per state, a
+# manifest in typing order, and signatures.txt (the tripwire: regenerate after
+# an engine change and the diff names every state whose layout moved).
+.PHONY: states-curate
+states-curate:
+	cd "$(TOOLS_REPO)" && go run ./cmd-dev/states-curate \
+		--in "$(STATES_RAW)" --out "$(STATES_CORPUS)"
 
 # Copy the rendered assets into the assets repository, which is the thing other
 # repositories link to. Nothing is committed here: what lands is for a human to

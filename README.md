@@ -11,7 +11,8 @@ extension's build.
 | Directory | What it is |
 | --- | --- |
 | [`demo/`](demo/) | Scripted screen recordings of the extension — real VS Code, driven by Playwright inside a container, captured to `mp4` + `gif`. |
-| [`docs/`](docs/) | Notes on the tooling itself — see [`headless-recording.md`](docs/headless-recording.md) for what a headless capture will lie to you about, and why a scene waits on state rather than on a pause. |
+| [`demo/states/`](demo/states/) | The same scenes, driven with the camera off, keeping every diagram state they type — a layout corpus for `ipm-tools`. See [`docs/states-corpus.md`](docs/states-corpus.md). |
+| [`docs/`](docs/) | Notes on the tooling itself — see [`headless-recording.md`](docs/headless-recording.md) for what a headless capture will lie to you about, and why a scene waits on state rather than on a pause, and [`states-corpus.md`](docs/states-corpus.md) for turning the scenes into layout regressions. |
 
 ## demo — programmatic feature videos
 
@@ -30,6 +31,7 @@ make demo SCENES="ipmt-preview"
 make demo SPEED=0.7 # 30% faster pauses and typing
 make demo ZOOM=2    # bigger workbench (1.2x per step) at the same frame size
 make list           # list available scenes
+make states         # no video: capture every typed diagram state (docs/states-corpus.md)
 ```
 
 Scenes are framed for legibility after the GIF downscale: Default Light Modern,
@@ -285,7 +287,8 @@ The stage API (`s`) is in [`demo/src/scene.ts`](demo/src/scene.ts) — `beat`,
 - The demo workspace under `demo/workspace/` contains **live** ` ```ipmt `
   fences — they are meant to be rendered by the extension. No `md-embed` or
   `sync-test-cases` scanner runs over this repo, so they do not enter any test
-  corpus.
+  corpus. What the scenes TYPE does, via `make states` — see
+  [`docs/states-corpus.md`](docs/states-corpus.md).
 
 ### Publishing the result
 
