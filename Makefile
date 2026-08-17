@@ -35,7 +35,14 @@ SPEED  ?= 1
 # put "[Superuser]" in VS Code's title bar -- on screen, in every frame.
 # demo/ goes in read-only: the container has no business writing to the scene
 # sources, and a scene once did exactly that (see initGitRepo in profile.ts).
-PODMAN_RUN = podman run --rm --shm-size=1g --userns=keep-id \
+# --memory: a hard ceiling on the recording container. Three laptop freezes in
+# two days were machine-wide OOMs; a runaway VS Code + Chromium + ffmpeg inside
+# the container should die at its own limit, not take the host down. A full
+# recording run peaks around 2-3G; 6G is generous. --memory-swap equal to
+# --memory means no swap for the container, so it dies fast instead of dragging
+# the host into swap first.
+MEM ?= 6g
+PODMAN_RUN = podman run --rm --shm-size=1g --userns=keep-id --memory=$(MEM) --memory-swap=$(MEM) \
 	-v "$(DEMO)":/work/demo:ro,z \
 	-v "$(OUT)":/work/out:z \
 	-e DEMO_WIDTH=$(WIDTH) -e DEMO_HEIGHT=$(HEIGHT) -e DEMO_FPS=$(FPS) \
@@ -107,7 +114,7 @@ rpc:
 E2E_ARGS ?=
 .PHONY: e2e
 e2e: ext-rpc
-	podman run --rm --shm-size=1g --userns=keep-id \
+	podman run --rm --shm-size=1g --userns=keep-id --memory=$(MEM) --memory-swap=$(MEM) \
 		-v "$(EXT_REPO)":/work/ext:z \
 		-v "$(TOOLS_REPO)":/work/ipm-tools:ro,z \
 		-v "$(DEMO)":/work/demo:ro,z \
