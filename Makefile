@@ -272,3 +272,18 @@ shell:
 .PHONY: clean
 clean:
 	rm -rf "$(OUT)"
+
+# Rendered-colour test: the real VS Code, the .vsix under test and a freshly
+# built ipm-rpc, colours read from the DOM. See docs/colours-e2e.md.
+#
+#   make colours-e2e EXT_REPO=... TOOLS_REPO=... IMAGE=ipm-vscode-demo-new
+#   make colours-e2e VSIX=/path/to/other.vsix   # e.g. the previous release
+COLOURS_RUNS ?=
+COLOURS_SETTINGS ?=
+.PHONY: colours-e2e
+colours-e2e: vsix rpc
+	podman run --rm --shm-size=1g --userns=keep-id --memory=$(MEM) --memory-swap=$(MEM) \
+		-v "$(DEMO)":/work/demo:ro,z \
+		-v "$(OUT)":/work/out:z \
+		-e DEMO_IPM_RPC=/work/out/ipm-rpc -e COLOURS_SETTINGS='$(COLOURS_SETTINGS)' \
+		--entrypoint bash $(IMAGE) /work/demo/bin/run-colours.sh $(COLOURS_RUNS)

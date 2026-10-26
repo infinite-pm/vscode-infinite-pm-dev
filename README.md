@@ -32,6 +32,7 @@ make demo SPEED=0.7 # 30% faster pauses and typing
 make demo ZOOM=2    # bigger workbench (1.2x per step) at the same frame size
 make list           # list available scenes
 make states         # no video: capture every typed diagram state (docs/states-corpus.md)
+make colours-e2e    # assert the rendered token colours from the DOM (docs/colours-e2e.md)
 ```
 
 Scenes are framed for legibility after the GIF downscale: Default Light Modern,
