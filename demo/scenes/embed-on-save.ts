@@ -54,7 +54,7 @@ export default {
 		await s.caption('Add an ipmt block');
 		await s.act('type-block', async () => {
 			await s.type('\n```ipmt\n', { delay: 55 });
-			await s.type('"Life, the Universe and Everything" ::e lue::a\n', { delay: 40 });
+			await s.type('"Life, the Universe and Everything" lue::a\n', { delay: 40 });
 			await s.type('humans / AI / machines ::t --> lue\n', { delay: 45 });
 			await s.type('lue --> Complex process ::c\n', { delay: 45 });
 			await s.type('```', { delay: 55 });

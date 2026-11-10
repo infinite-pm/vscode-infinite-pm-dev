@@ -5,5 +5,5 @@ line below, so this page renders as the diagram alone -- no ipmt source in the
 Markdown, on GitHub or in the preview.
 
 <!-- ipm-include src=./answer.ipmt -->
-<!-- ipm-svg id=answer hash=38507bcb -->
+<!-- ipm-svg id=answer hash=e290d511 -->
 ![](_ipm/page/answer.ipm.svg)

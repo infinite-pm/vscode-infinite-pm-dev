@@ -46,9 +46,9 @@ export default {
 		await s.caption('Open an ipmt fence and close it right away');
 		await s.act('type-fence', async () => {
 			await s.type('```ipmt\n', { delay: 60 });
-			await s.type('Beginning ::e\n', { delay: 45 });
-			await s.type('  --> "Life, the Universe and Everything" ::e lue::a\n', { delay: 38 });
-			await s.type('  --> Freeze ::e\n', { delay: 45 });
+			await s.type('Beginning\n', { delay: 45 });
+			await s.type('  --> "Life, the Universe and Everything" lue::a\n', { delay: 38 });
+			await s.type('  --> Freeze\n', { delay: 45 });
 			await s.type('```', { delay: 60 });
 		}, { settle: 1800, shows: 'An ipmt fence opened, given the model\'s opening spine, and closed straight away' });
 
@@ -64,11 +64,11 @@ export default {
 		await s.caption('Move back inside, above the closing fence');
 		await s.gotoLine(8);
 		await s.act('grow-block', async () => {
-			await s.type('\n\nLife ::e --::P--> lue', { delay: 45 });
+			await s.type('\n\nLife --::P--> lue', { delay: 45 });
 			await s.beat(1200);
-			await s.type('\nthe Universe, everything --> lue', { delay: 45 });
+			await s.type('\nthe Universe ::t, everything ::t --> lue', { delay: 45 });
 			await s.beat(1200);
-			await s.type('\n\nhumans --> Life', { delay: 50 });
+			await s.type('\n\nhumans ::t --> Life', { delay: 50 });
 		}, { settle: 2200, shows: 'Three more lines grown inside the block, each re-rendering the preview unsaved' });
 
 		await s.caption('Save again — the SVG on disk catches up with the fence');

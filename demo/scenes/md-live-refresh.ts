@@ -38,11 +38,11 @@ export default {
 		await s.gotoLine(13);
 		// 42-21.ipmt verbatim, ending on that example's last line.
 		await s.act('add-21st-century', async () => {
-			await s.type('\nl21::a Life in 21st century ::e --::P--> Life ::e', { delay: 40 });
+			await s.type('\nl21::a Life in 21st century --::P--> Life', { delay: 40 });
 		}, { settle: 1800, shows: 'A line typed into the fence appears in the preview, the file still unsaved' });
 
 		await s.act('add-humans-ais', async () => {
-			await s.type('\nhumans, AIs --> l21', { delay: 45 });
+			await s.type('\nhumans, AIs ::t --> l21', { delay: 45 });
 		}, { settle: 1600, shows: 'humans and AIs join it, still without a save' });
 
 		await s.act('add-alive', async () => {

@@ -28,20 +28,20 @@ export default {
 		// The lines typed here are 42-21.ipmt verbatim: the 21st century as a
 		// part of Life. Ends where that example ends, `humans --> alive ::c`.
 		await s.act('add-21st-century', async () => {
-			await s.type('l21::a Life in 21st century ::e --::P--> Life ::e\n', { delay: 40 });
+			await s.type('l21::a Life in 21st century --::P--> Life\n', { delay: 40 });
 		}, { settle: 1800, shows: 'A typed line adds "Life in 21st century" as part of Life — rendered without a save' });
 
 		await s.act('add-earth', async () => {
-			await s.type('\nEarth --> planet ::c\n', { delay: 45 });
+			await s.type('\nEarth ::t --> planet ::c\n', { delay: 45 });
 			await s.type('Earth --> l21\n', { delay: 50 });
 		}, { settle: 1800, shows: 'Earth joins, expressing the concept "planet" and feeding the 21st century' });
 
 		await s.act('add-humans-ais', async () => {
-			await s.type('\nhumans, AIs --> l21\n', { delay: 45 });
+			await s.type('\nhumans, AIs ::t --> l21\n', { delay: 45 });
 			await s.type('humans --> alive ::c\n', { delay: 45 });
 		}, { settle: 2000, shows: 'humans and AIs join the 21st century, and humans expresses "alive"' });
 
-		// `humans --> Life` (line 7) came with the file. Now that humans feeds
+		// `humans ::t --> Life` (line 7) came with the file. Now that humans feeds
 		// the 21st century, and the 21st century is *part of* Life, that edge
 		// states what the graph already implies -- so delete it. An edge you can
 		// derive is an edge worth removing; the render proves nothing was lost.
@@ -50,7 +50,7 @@ export default {
 		await s.gotoLine(7);
 		await s.act('remove-implied-edge', async () => {
 			await s.key('Control+Shift+K', { delay: 500 });
-			await s.waitForNoEditorText('humans --> Life');
+			await s.waitForNoEditorText('humans ::t --> Life');
 			await s.waitForNoPreviewError();
 			await s.waitForDiagram(3);
 		}, { settle: 2000, shows: 'The redundant edge is gone, and humans still reaches Life through the 21st century' });
